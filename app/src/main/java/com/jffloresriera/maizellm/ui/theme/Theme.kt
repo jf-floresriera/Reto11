@@ -5,14 +5,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
-// ⚠️ PLACEHOLDER: tema neutro de Material 3 por defecto. Pendiente de reemplazar por el
-// estilo de referencia ("Gulupa") en cuanto el usuario comparta cómo se ve esa app
-// (captura de pantalla, código o descripción). Cambiar solo este archivo no afecta el
-// resto de la app: toda la UI consume MaterialTheme.colorScheme, no colores sueltos.
+// Paleta propia del proyecto (ver Color.kt), consistente con el README y las gráficas.
+// Si más adelante se compara con el estilo de otra app de referencia, solo hay que
+// tocar este archivo: el resto de la UI consume MaterialTheme.colorScheme, no colores sueltos.
 
-private val EsquemaClaro = lightColorScheme()
-private val EsquemaOscuro = darkColorScheme()
+private val EsquemaClaro = lightColorScheme(
+    primary = Azul,
+    onPrimary = Color.White,
+    primaryContainer = AzulContenedor,
+    onPrimaryContainer = AzulOscuro,
+    secondary = Verde,
+    onSecondary = Color.White,
+    secondaryContainer = VerdeContenedor,
+    tertiary = Dorado,
+    tertiaryContainer = DoradoContenedor,
+    error = Rojo,
+    errorContainer = RojoContenedor,
+    onErrorContainer = Color(0xFF5F1611),
+    background = FondoClaro,
+    surface = SuperficieClara,
+    surfaceVariant = Color(0xFFEFF2F6),
+)
+
+private val EsquemaOscuro = darkColorScheme(
+    primary = Color(0xFF9FC7FF),
+    secondary = Color(0xFF9BD8AC),
+    tertiary = Color(0xFFFFD866),
+    error = Color(0xFFFFB4A9),
+)
 
 @Composable
 fun MaizeLlmTheme(
