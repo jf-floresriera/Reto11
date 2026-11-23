@@ -7,7 +7,7 @@ enum class Lang { ES, EN }
 enum class Level { AGRICULTOR, TECNICO, CIENTIFICO }
 
 /**
- * Las 6 instrucciones de sistema de base (constantes ES_*/EN_*) son las exactas usadas
+ * Las 6 instrucciones de sistema de base (constantes ES_ y EN_) son las exactas usadas
  * durante el SFT (sección 9.2 del documento de contexto del proyecto); no se deben
  * "mejorar" el texto a mano porque cambiarían cómo responde el modelo entrenado.
  * `forAndroid()` les agrega un prefijo de identidad (nombre y desarrollador) que el
