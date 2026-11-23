@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -34,9 +35,9 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
+    // La versión del compilador de Compose ya la resuelve el plugin
+    // org.jetbrains.kotlin.plugin.compose a partir de la versión de Kotlin;
+    // composeOptions.kotlinCompilerExtensionVersion ya no se usa.
 
     // El .gguf se empaqueta como asset. Si Android lo comprimiera dentro del APK,
     // habría que descomprimirlo en memoria antes de poder leerlo: con noCompress
