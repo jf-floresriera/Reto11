@@ -3,6 +3,7 @@ package com.jffloresriera.maizellm.ui
 import android.content.Intent
 import android.media.AudioManager
 import android.media.ToneGenerator
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,7 @@ import com.jffloresriera.maizellm.R
 import com.jffloresriera.maizellm.data.Tema
 import com.jffloresriera.maizellm.domain.Lang
 import com.jffloresriera.maizellm.domain.Level
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -557,18 +559,56 @@ private fun BurbujaTexto(texto: String) {
     }
 }
 
+// Datos y curiosidades sobre maíz/agronomía/ciencia, para que la espera (puede
+// tardar bastante en CPU de celular) se sienta más entretenida que un simple
+// "Escribiendo…". Van rotando con un efecto de desvanecido (Crossfade).
+private val MENSAJES_ESPERA = listOf(
+    "🌱 El maíz se domesticó hace más de 9.000 años en México.",
+    "🔬 Este modelo se entrenó con más de 41.000 documentos científicos.",
+    "🌾 Colombia tiene una enorme diversidad de maíces nativos.",
+    "💡 Agro IA corre 100% en tu celular, sin necesitar internet.",
+    "📚 La ciencia agrícola ayuda a alimentar a millones de personas.",
+    "🧬 El maíz tiene uno de los genomas más grandes entre los cereales.",
+    "🚜 El manejo integrado de plagas reduce el uso de agroquímicos.",
+    "🎓 Cada pregunta que haces ayuda a entender mejor estas herramientas.",
+)
+
 @Composable
 private fun BurbujaEscribiendo() {
+    var indice by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3200)
+            indice = (indice + 1) % MENSAJES_ESPERA.size
+        }
+    }
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
         Card(
+            modifier = Modifier.widthIn(max = 280.dp),
             shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         ) {
-            Text(
-                "Escribiendo…",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Text(
+                        "Generando respuesta…",
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Crossfade(targetState = indice, modifier = Modifier.padding(top = 6.dp)) { i ->
+                    Text(
+                        MENSAJES_ESPERA[i],
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
         }
     }
 }
