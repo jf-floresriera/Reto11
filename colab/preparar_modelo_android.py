@@ -122,38 +122,85 @@ ONNX_DIR = "/content/drive/MyDrive/maize_llm/runs/onnx/maize_llama32_1b_int4"
 #   !head -n 1 /content/drive/MyDrive/maize_llm_colab/data/datasets/sft_v1/test.jsonl
 # =========================================================================
 
-# Celda 9 — Levantar llama-server en segundo plano con el modelo cuantizado
-import subprocess, time
+# Celda 9 — Copiar el GGUF a disco LOCAL de Colab (Drive montado por FUSE es lento para
+# leer archivos grandes la primera vez; copiarlo una sola vez acelera la carga del servidor)
+# y levantar llama-server en segundo plano.
+import os, shutil, subprocess, time
+
+# Si el runtime se reinició y perdiste las variables de las celdas 1-8, usa la ruta por defecto.
+GGUF_DIR = globals().get("GGUF_DIR", "/content/drive/MyDrive/maize_llm/runs/gguf")
+MODEL_DRIVE = f"{GGUF_DIR}/maize_llama32_1b_Q4_K_M.gguf"
+MODEL_LOCAL = "/content/maize_llama32_1b_Q4_K_M.gguf"
+
+if not os.path.exists(MODEL_LOCAL):
+    print("Copiando el modelo de Drive a disco local (una sola vez)...")
+    shutil.copy(MODEL_DRIVE, MODEL_LOCAL)
+print(f"Modelo local listo: {os.path.getsize(MODEL_LOCAL) / 1e6:.0f} MB")
 
 SERVER_LOG = "/content/llama_server.log"
 server_proc = subprocess.Popen(
     ["/content/llama.cpp/build/bin/llama-server",
-     "-m", f"{GGUF_DIR}/maize_llama32_1b_Q4_K_M.gguf",
+     "-m", MODEL_LOCAL,
      "-c", "2048", "--host", "127.0.0.1", "--port", "8080"],
     stdout=open(SERVER_LOG, "w"), stderr=subprocess.STDOUT,
 )
 print("Arrancando servidor, PID:", server_proc.pid)
 
-# Celda 10 — Esperar a que el servidor esté listo
+# Celda 10 — Esperar al servidor, con diagnóstico automático si algo falla.
+# Hasta 6 minutos (90 intentos x 4 s): la primera carga de un modelo puede tardar.
 import requests
 
 listo = False
-for _ in range(60):
+for intento in range(90):
+    if server_proc.poll() is not None:
+        print(f"El proceso del servidor terminó solo (código {server_proc.returncode}). Log:")
+        print(open(SERVER_LOG).read()[-3000:])
+        break
     try:
         if requests.get("http://127.0.0.1:8080/health", timeout=2).status_code == 200:
             listo = True
             break
     except Exception:
         pass
-    time.sleep(2)
-print("Servidor listo" if listo else "El servidor no respondió a tiempo; revisa " + SERVER_LOG)
+    if intento % 10 == 0:
+        print(f"Esperando... {intento * 4} s")
+    time.sleep(4)
+
+if listo:
+    print("Servidor listo ✅")
+else:
+    print("No quedó listo en 6 minutos. Últimas líneas del log:")
+    print(open(SERVER_LOG).read()[-3000:])
+
+# Celda 10b — DIAGNÓSTICO: ubicar el test.jsonl real de sft_v1 en tu Drive.
+# Corre esto ANTES de la celda 11 y pega la salida si la ruta no aparece sola.
+import subprocess
+
+encontrados = subprocess.run(
+    ["find", "/content/drive/MyDrive", "-ipath", "*sft_v1*test.jsonl"],
+    capture_output=True, text=True,
+).stdout.strip().splitlines()
+
+if not encontrados:
+    print("No encontré ningún 'sft_v1/.../test.jsonl'. Buscando cualquier carpeta 'sft_v1'...")
+    print(subprocess.run(["find", "/content/drive/MyDrive", "-ipath", "*sft_v1*"],
+                          capture_output=True, text=True).stdout)
+else:
+    for ruta in encontrados:
+        print("Candidato:", ruta)
+    SFT_TEST_PATH = encontrados[0]
+    print("\nUsando:", SFT_TEST_PATH)
+    print("\nPrimera línea (para ver los nombres de campo reales):")
+    with open(SFT_TEST_PATH, encoding="utf-8") as f:
+        print(f.readline())
 
 # Celda 11 — Recorrer sft_v1/test.jsonl, generar respuesta y chequear señales
 # de riesgo (cifra sin respaldo, cita de fuente, idioma). AJUSTA las claves
-# de campo según lo que te devuelva el !head de arriba.
+# de campo según lo que te haya mostrado la celda 10b.
 import json, re, datetime
 
-SFT_TEST_PATH = "/content/drive/MyDrive/maize_llm_colab/data/datasets/sft_v1/test.jsonl"  # <-- ajustar si aplica
+# SFT_TEST_PATH ya debería estar definida por la celda 10b. Si no, defínela a mano aquí:
+# SFT_TEST_PATH = "/content/drive/MyDrive/.../test.jsonl"
 RESULTS_PATH  = f"/content/drive/MyDrive/maize_llm/runs/eval_gguf_q4km_{datetime.date.today()}.jsonl"
 
 QUESTION_FIELD = "question"   # <-- ajustar
