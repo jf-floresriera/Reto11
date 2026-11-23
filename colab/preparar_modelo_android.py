@@ -1,18 +1,21 @@
 # =========================================================================
-# Notebook de Colab: fusionar adaptador LoRA + cuantizar a GGUF (y, opcional,
-# exportar a ONNX int4 para comparar) — proyecto maize_llm, Reto 11
-# Cada bloque "# Celda N" es una celda independiente de Colab.
+# Notebook de Colab — proyecto maize_llm, Reto 11
+# Fusionar adaptador LoRA + cuantizar a GGUF + evaluar el modelo cuantizado.
+# Cada bloque "# Celda N" es una celda independiente de Colab. Copia cada
+# celda completa (no a mano encima de una vieja) para evitar errores de
+# copiado y pegado.
 # =========================================================================
 
-# Celda 1 — Dependencias (mismas versiones que usó el proyecto, sección 9.1)
+# Celda 1 — Dependencias
 !pip install -q transformers==4.51.3 peft==0.15.2 accelerate torch==2.11.0 huggingface_hub
 
+# =========================================================================
 # Celda 2 — Montar Drive y autenticarse en Hugging Face
 # Llama-3.2-1B-Instruct es un modelo con licencia: hay que haberla aceptado
 # en huggingface.co y generar un token (Settings > Access Tokens).
-# El token se lee del secreto de Colab 'HF_TOKEN' (panel de llave 🔑 a la
-# izquierda del notebook), no de un prompt interactivo: así "Ejecutar todo"
-# no se detiene a mitad de camino y el token no queda impreso en pantalla.
+# El token se lee del secreto de Colab 'HF_TOKEN' (panel de llave a la
+# izquierda del notebook), no de un prompt interactivo.
+# =========================================================================
 from google.colab import drive, userdata
 from huggingface_hub import login, whoami
 
@@ -22,25 +25,25 @@ try:
     token = userdata.get('HF_TOKEN')
 except userdata.SecretNotFoundError:
     raise SystemExit(
-        "No existe un secreto llamado 'HF_TOKEN'. Crea uno en el panel de "
-        "llave (\U0001F511) a la izquierda del notebook, con ese nombre exacto."
+        "No existe un secreto llamado 'HF_TOKEN'. Crealo en el panel de "
+        "llave a la izquierda del notebook, con ese nombre exacto."
     )
 except userdata.NotebookAccessError:
     raise SystemExit(
-        "El secreto 'HF_TOKEN' existe pero este notebook no tiene permiso para "
-        "leerlo. Activa el interruptor de acceso junto al secreto en el panel "
-        "de llave (\U0001F511)."
+        "El secreto 'HF_TOKEN' existe pero este notebook no tiene permiso "
+        "para leerlo. Activa el interruptor de acceso junto al secreto."
     )
 
 token = (token or '').strip()
 if not token.startswith('hf_') or ' ' in token or len(token) > 60:
-    raise SystemExit('El secreto HF_TOKEN no parece válido: debe ser únicamente el texto que empieza por "hf_".')
+    raise SystemExit('El secreto HF_TOKEN no parece valido: debe ser unicamente el texto que empieza por "hf_".')
 
 login(token)
-print('Sesión Hugging Face:', whoami()['name'])
+print('Sesion Hugging Face:', whoami()['name'])
 
+# =========================================================================
 # Celda 3 — Fusionar el adaptador LoRA (DAPT M2 + SFT, un solo adapter) con el base
-# Ajusta ADAPTER_PATH si tu carpeta de Drive tiene otro nombre.
+# =========================================================================
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 import torch
@@ -58,7 +61,9 @@ merged.save_pretrained(MERGED_OUT, safe_serialization=True)
 tok.save_pretrained(MERGED_OUT)
 print("Modelo fusionado guardado en:", MERGED_OUT)
 
+# =========================================================================
 # Celda 4 — Clonar llama.cpp y convertir el modelo fusionado a GGUF (f16)
+# =========================================================================
 !git clone --depth 1 https://github.com/ggml-org/llama.cpp /content/llama.cpp
 !pip install -q -r /content/llama.cpp/requirements.txt
 
@@ -69,9 +74,9 @@ GGUF_DIR = "/content/drive/MyDrive/maize_llm/runs/gguf"
     --outfile {GGUF_DIR}/maize_llama32_1b_f16.gguf \
     --outtype f16
 
+# =========================================================================
 # Celda 5 — Compilar llama-quantize y cuantizar a Q4_K_M
-# Q4_K_M es el punto de partida recomendado por llama.cpp para 1B en celulares
-# de 6 GB+: calidad razonable con ~0.7-0.8 GB de archivo.
+# =========================================================================
 !cmake -S /content/llama.cpp -B /content/llama.cpp/build -DGGML_CUDA=OFF -DCMAKE_BUILD_TYPE=Release
 !cmake --build /content/llama.cpp/build --target llama-quantize -j$(nproc)
 
@@ -82,23 +87,21 @@ GGUF_DIR = "/content/drive/MyDrive/maize_llm/runs/gguf"
 
 !ls -lh {GGUF_DIR}
 
-# Celda 6 — Verificación rápida en el propio Colab (antes de llevarlo al celular)
+# =========================================================================
+# Celda 6 — Verificacion rapida en el propio Colab (antes de llevarlo al celular)
+# =========================================================================
 !cmake --build /content/llama.cpp/build --target llama-cli -j$(nproc)
 !/content/llama.cpp/build/bin/llama-cli \
     -m {GGUF_DIR}/maize_llama32_1b_Q4_K_M.gguf \
     -c 2048 -n 200 \
-    -p "<|start_header_id|>system<|end_header_id|>\n\nEres un asistente de sanidad vegetal para el cultivo de maíz en Colombia y Estados Unidos. Responde para un agricultor: lenguaje sencillo, frases cortas y pasos prácticos, sin tecnicismos. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el país de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n¿Cómo reconozco la mancha de asfalto en mi maíz?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+    -p "<|start_header_id|>system<|end_header_id|>\n\nEres un asistente de sanidad vegetal para el cultivo de maiz en Colombia y Estados Unidos. Responde para un agricultor: lenguaje sencillo, frases cortas y pasos practicos, sin tecnicismos. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el pais de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n¿Como reconozco la mancha de asfalto en mi maiz?<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
 # =========================================================================
-# Celdas 7-8 (OPCIONAL) — Exportar también a ONNX int4 para comparar tamaño
-# y velocidad contra el GGUF. No es necesario para el Reto 11; solo si
-# quieres el dato comparativo.
+# Celdas 7-8 (OPCIONAL) — Exportar tambien a ONNX int4, solo para comparar.
+# No es necesario para el Reto 11.
 # =========================================================================
-
-# Celda 7 — Instalar onnxruntime-genai
 !pip install -q onnxruntime-genai onnxruntime
 
-# Celda 8 — Convertir el modelo fusionado (carpeta local, no el nombre del Hub)
 ONNX_DIR = "/content/drive/MyDrive/maize_llm/runs/onnx/maize_llama32_1b_int4"
 !mkdir -p /content/onnx_cache
 !python -m onnxruntime_genai.models.builder \
@@ -111,23 +114,12 @@ ONNX_DIR = "/content/drive/MyDrive/maize_llm/runs/onnx/maize_llama32_1b_int4"
 !ls -lh {ONNX_DIR}
 
 # =========================================================================
-# Celdas 9-12 — Evaluar el GGUF cuantizado contra el conjunto maestro SFT
-# (sft_v1/test.jsonl) y guardar todo en Drive, antes de pasar a la app.
-#
-# OJO: no he visto el contenido real de sft_v1/test.jsonl, así que los
-# nombres de campo (QUESTION_FIELD, LEVEL_FIELD, LANG_FIELD) de más abajo
-# son una SUPOSICIÓN basada en la descripción del documento de contexto.
-# Antes de correr la celda 11, ejecuta esto y pégame la salida para que
-# ajuste las claves correctas:
-#   !head -n 1 /content/drive/MyDrive/maize_llm_colab/data/datasets/sft_v1/test.jsonl
+# Celda 9 — Copiar el GGUF a disco LOCAL de Colab (Drive montado por FUSE es
+# lento para leer archivos grandes la primera vez) y levantar llama-server.
 # =========================================================================
-
-# Celda 9 — Copiar el GGUF a disco LOCAL de Colab (Drive montado por FUSE es lento para
-# leer archivos grandes la primera vez; copiarlo una sola vez acelera la carga del servidor)
-# y levantar llama-server en segundo plano.
 import os, shutil, subprocess, time
 
-# Si el runtime se reinició y perdiste las variables de las celdas 1-8, usa la ruta por defecto.
+# Si el runtime se reinicio y perdiste las variables de las celdas 1-8, usa la ruta por defecto.
 GGUF_DIR = globals().get("GGUF_DIR", "/content/drive/MyDrive/maize_llm/runs/gguf")
 MODEL_DRIVE = f"{GGUF_DIR}/maize_llama32_1b_Q4_K_M.gguf"
 MODEL_LOCAL = "/content/maize_llama32_1b_Q4_K_M.gguf"
@@ -146,14 +138,16 @@ server_proc = subprocess.Popen(
 )
 print("Arrancando servidor, PID:", server_proc.pid)
 
-# Celda 10 — Esperar al servidor, con diagnóstico automático si algo falla.
+# =========================================================================
+# Celda 10 — Esperar al servidor, con diagnostico automatico si algo falla.
 # Hasta 6 minutos (90 intentos x 4 s): la primera carga de un modelo puede tardar.
+# =========================================================================
 import requests
 
 listo = False
 for intento in range(90):
     if server_proc.poll() is not None:
-        print(f"El proceso del servidor terminó solo (código {server_proc.returncode}). Log:")
+        print(f"El proceso del servidor termino solo (codigo {server_proc.returncode}). Log:")
         print(open(SERVER_LOG).read()[-3000:])
         break
     try:
@@ -167,13 +161,16 @@ for intento in range(90):
     time.sleep(4)
 
 if listo:
-    print("Servidor listo ✅")
+    print("Servidor listo")
 else:
-    print("No quedó listo en 6 minutos. Últimas líneas del log:")
+    print("No quedo listo en 6 minutos. Ultimas lineas del log:")
     print(open(SERVER_LOG).read()[-3000:])
 
-# Celda 10b — DIAGNÓSTICO: ubicar el test.jsonl real de sft_v1 en tu Drive.
-# Corre esto ANTES de la celda 11 y pega la salida si la ruta no aparece sola.
+# =========================================================================
+# Celda 10b (diagnostico opcional) — Confirmar la ruta del archivo de prueba.
+# Ya se confirmo una vez que es esta ruta; se deja el buscador por si cambia:
+#   /content/drive/MyDrive/maize_llm/runs/colab_sft_v1_llama32_1b/sft_generaciones_test.jsonl
+# =========================================================================
 import subprocess
 
 encontrados = subprocess.run(
@@ -181,42 +178,33 @@ encontrados = subprocess.run(
     capture_output=True, text=True,
 ).stdout.strip().splitlines()
 
-if not encontrados:
-    print("No encontré ningún 'sft_v1/.../test.jsonl'. Buscando cualquier carpeta 'sft_v1'...")
-    print(subprocess.run(["find", "/content/drive/MyDrive", "-ipath", "*sft_v1*"],
-                          capture_output=True, text=True).stdout)
-else:
-    for ruta in encontrados:
-        print("Candidato:", ruta)
-    SFT_TEST_PATH = encontrados[0]
-    print("\nUsando:", SFT_TEST_PATH)
-    print("\nPrimera línea (para ver los nombres de campo reales):")
-    with open(SFT_TEST_PATH, encoding="utf-8") as f:
-        print(f.readline())
+for ruta in encontrados:
+    print("Candidato:", ruta)
 
-# Celda 11 — Recorrer sft_v1/test.jsonl, generar respuesta y chequear señales
-# de riesgo (cifra sin respaldo, cita de fuente, idioma). AJUSTA las claves
-# de campo según lo que te haya mostrado la celda 10b.
+# =========================================================================
+# Celda 11 — Generar respuesta con el GGUF cuantizado para cada conversacion
+# del test, y comparar contra la respuesta original (sin cuantizar) que ya
+# trae el archivo sft_generaciones_test.jsonl.
+# =========================================================================
 import json, re, datetime
 
-# SFT_TEST_PATH ya debería estar definida por la celda 10b. Si no, defínela a mano aquí:
-# SFT_TEST_PATH = "/content/drive/MyDrive/.../test.jsonl"
+SFT_TEST_PATH = "/content/drive/MyDrive/maize_llm/runs/colab_sft_v1_llama32_1b/sft_generaciones_test.jsonl"
 RESULTS_PATH  = f"/content/drive/MyDrive/maize_llm/runs/eval_gguf_q4km_{datetime.date.today()}.jsonl"
 
-QUESTION_FIELD = "question"   # <-- ajustar
-LEVEL_FIELD    = "level"      # <-- ajustar: agricultor / tecnico / cientifico
-LANG_FIELD     = "lang"       # <-- ajustar: es / en
+QUESTION_FIELD = "pregunta"
+LEVEL_FIELD    = "nivel"   # valores: agricultor / tecnico / cientifico (iguales en ES y EN)
+LANG_FIELD     = "lang"    # valores: es / en
 
 SYSTEM_PROMPTS = {
-    ("es", "agricultor"): "Eres un asistente de sanidad vegetal para el cultivo de maíz en Colombia y Estados Unidos. Responde para un agricultor: lenguaje sencillo, frases cortas y pasos prácticos, sin tecnicismos. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el país de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
-    ("es", "tecnico"): "Eres un asistente de sanidad vegetal para el cultivo de maíz en Colombia y Estados Unidos. Responde para un técnico o agrónomo: momentos de aplicación, umbrales, métodos y manejo integrado. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el país de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
-    ("es", "cientifico"): "Eres un asistente de sanidad vegetal para el cultivo de maíz en Colombia y Estados Unidos. Responde para un investigador: mecanismos, evidencia, condiciones y limitaciones de los estudios. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el país de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
-    ("en", "farmer"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a farmer: plain language, short sentences and practical steps, no jargon. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
-    ("en", "technician"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a technician or agronomist: timing, thresholds, methods and integrated management. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
-    ("en", "researcher"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a researcher: mechanisms, evidence, conditions and limitations of the studies. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
+    ("es", "agricultor"): "Eres un asistente de sanidad vegetal para el cultivo de maiz en Colombia y Estados Unidos. Responde para un agricultor: lenguaje sencillo, frases cortas y pasos practicos, sin tecnicismos. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el pais de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
+    ("es", "tecnico"): "Eres un asistente de sanidad vegetal para el cultivo de maiz en Colombia y Estados Unidos. Responde para un tecnico o agronomo: momentos de aplicacion, umbrales, metodos y manejo integrado. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el pais de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
+    ("es", "cientifico"): "Eres un asistente de sanidad vegetal para el cultivo de maiz en Colombia y Estados Unidos. Responde para un investigador: mecanismos, evidencia, condiciones y limitaciones de los estudios. No inventes dosis, cifras ni productos. Si mencionas un producto o ingrediente activo, indica el pais de registro (ICA en Colombia, EPA en Estados Unidos) y que siempre se debe seguir la etiqueta registrada. Termina citando la fuente.",
+    ("en", "agricultor"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a farmer: plain language, short sentences and practical steps, no jargon. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
+    ("en", "tecnico"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a technician or agronomist: timing, thresholds, methods and integrated management. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
+    ("en", "cientifico"): "You are a plant-health assistant for maize in Colombia and the United States. Answer for a researcher: mechanisms, evidence, conditions and limitations of the studies. Do not invent doses, figures or products. If you mention a product or active ingredient, state the country of registration (ICA in Colombia, EPA in the United States) and that the registered label must always be followed. End by citing the source.",
 }
 
-DOSE_RE = re.compile(r"\d+[\.,]?\d*\s*(L/ha|kg/ha|g/L|%|d[ií]as|days)", re.IGNORECASE)
+DOSE_RE = re.compile(r"\d+[.,]?\d*\s*(L/ha|kg/ha|g/L|%|d[ii]as|days)", re.IGNORECASE)
 CITA_RE = re.compile(r"(fuente|source)\s*:", re.IGNORECASE)
 
 def preguntar(system, user, max_tokens=320):
@@ -241,7 +229,7 @@ for i, item in enumerate(items):
     pregunta = item[QUESTION_FIELD]
     system = SYSTEM_PROMPTS.get((lang, level))
     if system is None:
-        registro = {"idx": i, "error": f"combinación lang/level sin system prompt: {lang}/{level}"}
+        registro = {"idx": i, "error": f"combinacion lang/level sin system prompt: {lang}/{level}"}
     else:
         try:
             respuesta = preguntar(system, pregunta)
@@ -250,7 +238,9 @@ for i, item in enumerate(items):
                 "lang": lang,
                 "level": level,
                 "pregunta": pregunta,
-                "respuesta": respuesta,
+                "respuesta_gguf": respuesta,
+                "respuesta_original": item.get("respuesta"),
+                "referencia": item.get("referencia"),
                 "cita_fuente": bool(CITA_RE.search(respuesta)),
                 "cifra_posible_sin_respaldo": bool(DOSE_RE.search(respuesta)),
             }
@@ -258,23 +248,24 @@ for i, item in enumerate(items):
             registro = {"idx": i, "error": str(e)}
     resultados.append(registro)
 
-    # Guardado incremental: si se corta la sesión, no se pierde lo ya hecho.
     if i % 20 == 0 or i == len(items) - 1:
         with open(RESULTS_PATH, "w", encoding="utf-8") as out:
             for r_ in resultados:
-                out.write(json.dumps(r_, ensure_ascii=False) + "\n")
-        print(f"{i + 1}/{len(items)} procesadas — guardado en {RESULTS_PATH}")
+                print(json.dumps(r_, ensure_ascii=False), file=out)
+        print(f"{i + 1}/{len(items)} procesadas - guardado en {RESULTS_PATH}")
 
-print("Evaluación terminada. Resultados en:", RESULTS_PATH)
+print("Evaluacion terminada. Resultados en:", RESULTS_PATH)
 
-# Celda 12 — Resumen rápido y cierre del servidor
+# =========================================================================
+# Celda 12 — Resumen rapido y cierre del servidor
+# =========================================================================
 import pandas as pd
 
 df = pd.DataFrame([r for r in resultados if "error" not in r])
 if len(df):
     print(df.groupby(["lang", "level"])[["cita_fuente", "cifra_posible_sin_respaldo"]].mean())
 else:
-    print("No hay resultados válidos para resumir; revisa los errores en", RESULTS_PATH)
+    print("No hay resultados validos para resumir; revisa los errores en", RESULTS_PATH)
 
 server_proc.terminate()
 print("Servidor detenido.")
