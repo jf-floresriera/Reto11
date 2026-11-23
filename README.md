@@ -190,8 +190,37 @@ Documentados en el proyecto original y confirmados con una prueba real sobre el 
 
 ```
 colab/      scripts pensados para correr en Google Colab (fusión de adaptador, GGUF, evaluación)
-app/        (próximamente) proyecto Android/Kotlin del chatbot
+charts/     script de Python que genera las gráficas de este README desde resumen_colab.json
+assets/     logo e imágenes
+app/        proyecto Android/Kotlin del chatbot (Jetpack Compose)
 ```
+
+## 📱 La app Android
+
+Kotlin + Jetpack Compose. La inferencia usa un AAR precompilado de llama.cpp
+([`llama-android`](https://github.com/ffmpegkit-maintained/llama-android), MIT, Maven Central) en vez de compilar
+llama.cpp desde cero con NDK/CMake — menos piezas que pueden fallar en un proyecto académico.
+
+- `domain/SystemPrompts.kt` — las 6 instrucciones de sistema exactas del SFT (idioma × nivel).
+- `domain/DoseGuardrail.kt` — detecta cifras con unidad sin respaldar y ausencia de cita de fuente (sección 9.4).
+- `data/ModelAssetInstaller.kt` — copia el `.gguf` de los assets del APK a almacenamiento interno la primera vez.
+- `data/ModelRepository.kt` — carga el modelo y genera respuestas.
+- `ui/` — pantalla de chat (Compose) + `ChatViewModel`.
+
+**Importante — no compilado en este entorno:** este sandbox no tiene Android SDK/NDK, así que el proyecto se
+escribió con cuidado pero no se compiló ni se corrió aquí. Antes de dar por buena la app:
+
+1. Copia tu `maize_llama32_1b_Q4_K_M.gguf` (el que genera `colab/preparar_modelo_android.py`) a
+   `app/src/main/assets/models/` (ver `LEEME.txt` en esa carpeta). Ese archivo no está en git —GitHub bloquea
+   binarios de más de 100 MB sin Git LFS— así que se queda local en tu copia del repo.
+2. Abre la carpeta raíz del repo en Android Studio y deja que sincronice (instalará el SDK/NDK que falte).
+3. Compila y corre en un **celular físico arm64** (el AAR gratuito de llama.cpp solo trae binarios arm64-v8a;
+   el emulador estándar x86_64 no va a cargar el modelo).
+4. Si Android Studio marca `menuAnchor()` como obsoleto, es un cambio de API menor y seguro de aceptar
+   (está documentado en el propio archivo `ui/ChatScreen.kt`).
+
+El tema visual (`ui/theme/Theme.kt`) está en Material 3 neutro a propósito, pendiente de una referencia de
+estilo que el autor va a compartir.
 
 ## 📜 Licencia del modelo base
 
