@@ -7,9 +7,11 @@ enum class Lang { ES, EN }
 enum class Level { AGRICULTOR, TECNICO, CIENTIFICO }
 
 /**
- * Las 6 instrucciones de sistema exactas usadas durante el SFT (sección 9.2 del documento
- * de contexto del proyecto). Deben coincidir con las que vio el modelo en entrenamiento:
- * cambiarlas aquí cambia cómo responde, así que no se deben "mejorar" el texto a mano.
+ * Las 6 instrucciones de sistema de base (constantes ES_*/EN_*) son las exactas usadas
+ * durante el SFT (sección 9.2 del documento de contexto del proyecto); no se deben
+ * "mejorar" el texto a mano porque cambiarían cómo responde el modelo entrenado.
+ * `forAndroid()` les agrega un prefijo de identidad (nombre y desarrollador) que el
+ * modelo nunca vio en el entrenamiento, pero que necesita para no inventar esa parte.
  */
 object SystemPrompts {
 
@@ -55,7 +57,21 @@ object SystemPrompts {
         "EPA in the United States) and that the registered label must always be followed. End " +
         "by citing the source."
 
-    fun forAndroid(lang: Lang, level: Level): String = when (lang to level) {
+    // Identidad del asistente: NO estaba en los prompts del SFT (el modelo nunca fue
+    // entrenado con su nombre ni con quién lo desarrolló, por eso inventaba una respuesta
+    // si se le preguntaba). Se agrega como prefijo en tiempo de ejecución, sin tocar las
+    // constantes de arriba, para no alterar las instrucciones exactas que sí vio en el
+    // entrenamiento.
+    private const val IDENTIDAD_ES = "Te llamas Maíz IA. Te desarrolló Jesús Enrique Flores " +
+        "Riera, estudiante de Geomática, como proyecto académico (Reto 11). Si te preguntan tu " +
+        "nombre o quién te hizo, responde con esta información exacta, sin inventar nada más. "
+
+    private const val IDENTIDAD_EN = "Your name is Maíz IA. You were developed by Jesús " +
+        "Enrique Flores Riera, a Geomatics student, as an academic project (Reto 11). If asked " +
+        "your name or who made you, answer with this exact information, without inventing " +
+        "anything else. "
+
+    private fun base(lang: Lang, level: Level): String = when (lang to level) {
         Lang.ES to Level.AGRICULTOR -> ES_AGRICULTOR
         Lang.ES to Level.TECNICO -> ES_TECNICO
         Lang.ES to Level.CIENTIFICO -> ES_CIENTIFICO
@@ -63,5 +79,10 @@ object SystemPrompts {
         Lang.EN to Level.TECNICO -> EN_TECHNICIAN
         Lang.EN to Level.CIENTIFICO -> EN_RESEARCHER
         else -> ES_AGRICULTOR
+    }
+
+    fun forAndroid(lang: Lang, level: Level): String {
+        val identidad = if (lang == Lang.ES) IDENTIDAD_ES else IDENTIDAD_EN
+        return identidad + base(lang, level)
     }
 }
