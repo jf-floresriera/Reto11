@@ -6,14 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.jffloresriera.maizellm.data.InstallProgress
 import com.jffloresriera.maizellm.data.ModelAssetInstaller
 import com.jffloresriera.maizellm.data.ModelRepository
+import com.jffloresriera.maizellm.domain.Citas
 import com.jffloresriera.maizellm.domain.DoseGuardrail
 import com.jffloresriera.maizellm.domain.Lang
 import com.jffloresriera.maizellm.domain.Level
 import com.jffloresriera.maizellm.domain.SystemPrompts
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -22,6 +26,7 @@ enum class Autor { USUARIO, ASISTENTE }
 data class Mensaje(
     val autor: Autor,
     val texto: String,
+    val referencias: List<String> = emptyList(),
     val cifraSinVerificar: Boolean = false,
     val citaFuente: Boolean = false,
 )
@@ -53,6 +58,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    // Evento de "sonido" (ver nota en ChatScreen): se dispara cuando la respuesta
+    // ya quedó completa, para que la UI reproduzca un tono corto.
+    private val _eventosSonido = Channel<Unit>(Channel.CONFLATED)
+    val eventosSonido: Flow<Unit> = _eventosSonido.receiveAsFlow()
 
     init {
         prepararModelo()
@@ -135,19 +145,24 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(textoEnProgreso = textoCompleto.substring(0, i)) }
             delay(16)
         }
+        val (cuerpo, referencias) = Citas.extraer(textoCompleto)
         _uiState.update {
             it.copy(
                 mensajes = it.mensajes + Mensaje(
                     autor = Autor.ASISTENTE,
-                    texto = textoCompleto,
+                    texto = cuerpo,
+                    referencias = referencias,
                     cifraSinVerificar = DoseGuardrail.containsUnverifiedFigure(textoCompleto),
-                    citaFuente = DoseGuardrail.citesSource(textoCompleto),
+                    citaFuente = referencias.isNotEmpty(),
                 ),
                 generandoRespuesta = false,
                 textoEnProgreso = null,
             )
         }
+        _eventosSonido.trySend(Unit)
     }
+
+    fun borrarConversacion() = _uiState.update { it.copy(mensajes = emptyList()) }
 
     /** Texto plano de toda la conversación, para compartir o descargar. */
     fun construirTranscripcion(): String {

@@ -1,6 +1,8 @@
 package com.jffloresriera.maizellm.ui
 
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,8 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,6 +42,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -64,6 +72,22 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     val estado by viewModel.uiState.collectAsState()
     val contexto = LocalContext.current
 
+    // Sonido corto cuando la respuesta queda lista (no es una notificación del
+    // sistema, es un "beep" generado en el momento, no necesita archivos de audio).
+    LaunchedEffect(Unit) {
+        viewModel.eventosSonido.collect {
+            val tono = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80)
+            tono.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        }
+    }
+
+    var menuAbierto by remember { mutableStateOf(false) }
+    var dialogoAcercaDeAbierto by remember { mutableStateOf(false) }
+
+    if (dialogoAcercaDeAbierto) {
+        DialogoAcercaDe(onCerrar = { dialogoAcercaDeAbierto = false })
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,14 +101,32 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     )
                 },
                 actions = {
-                    IconButton(onClick = {
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, viewModel.construirTranscripcion())
-                        }
-                        contexto.startActivity(Intent.createChooser(intent, "Compartir conversación"))
-                    }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Compartir conversación")
+                    IconButton(onClick = { menuAbierto = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "Más opciones")
+                    }
+                    DropdownMenu(expanded = menuAbierto, onDismissRequest = { menuAbierto = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Acerca de") },
+                            leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                            onClick = { menuAbierto = false; dialogoAcercaDeAbierto = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Compartir conversación") },
+                            leadingIcon = { Icon(Icons.Filled.Share, contentDescription = null) },
+                            onClick = {
+                                menuAbierto = false
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, viewModel.construirTranscripcion())
+                                }
+                                contexto.startActivity(Intent.createChooser(intent, "Compartir conversación"))
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Borrar conversación") },
+                            leadingIcon = { Icon(Icons.Filled.DeleteSweep, contentDescription = null) },
+                            onClick = { menuAbierto = false; viewModel.borrarConversacion() },
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -129,6 +171,37 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
             }
         }
     }
+}
+
+@Composable
+private fun DialogoAcercaDe(onCerrar: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Acerca de Maíz IA") },
+        text = {
+            Column {
+                Text(
+                    "Chatbot de sanidad del cultivo de maíz, con un modelo de lenguaje " +
+                        "especializado que corre 100% en el celular, sin conexión a internet.",
+                )
+                Text(
+                    "Modelo: Llama 3.2 1B + DAPT + SFT (Reto 11).",
+                    modifier = Modifier.padding(top = 10.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Text(
+                    "Desarrollador: Jesús Enrique Flores Riera",
+                    modifier = Modifier.padding(top = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Estudiante de Geomática",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onCerrar) { Text("Cerrar") } },
+    )
 }
 
 @Composable
@@ -311,9 +384,34 @@ private fun BurbujaMensaje(mensaje: Mensaje) {
                         MaterialTheme.colorScheme.onSecondaryContainer
                     },
                 )
+                if (!esUsuario && mensaje.referencias.isNotEmpty()) {
+                    ListaReferencias(mensaje.referencias)
+                }
                 if (!esUsuario && mensaje.cifraSinVerificar) {
                     AvisoCifraSinVerificar()
                 }
+            }
+        }
+    }
+}
+
+/** Muestra cada cita que el modelo incluyó como una fila separada (puede ser 1 o más). */
+@Composable
+private fun ListaReferencias(referencias: List<String>) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        referencias.forEach { referencia ->
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(
+                    Icons.Filled.Link,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp).padding(top = 2.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+                Text(
+                    referencia,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
             }
         }
     }
