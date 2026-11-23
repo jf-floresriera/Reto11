@@ -1,5 +1,6 @@
 package com.jffloresriera.maizellm.ui
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -7,15 +8,18 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,6 +29,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -35,6 +40,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -55,6 +62,7 @@ import com.jffloresriera.maizellm.domain.Level
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     val estado by viewModel.uiState.collectAsState()
+    val contexto = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -68,6 +76,17 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         tint = Color.Unspecified,
                     )
                 },
+                actions = {
+                    IconButton(onClick = {
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, viewModel.construirTranscripcion())
+                        }
+                        contexto.startActivity(Intent.createChooser(intent, "Compartir conversación"))
+                    }) {
+                        Icon(Icons.Filled.Share, contentDescription = "Compartir conversación")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -76,7 +95,12 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .imePadding(), // empuja el contenido hacia arriba cuando el teclado está abierto
+        ) {
 
             SelectorIdiomaYNivel(
                 lang = estado.lang,
@@ -98,6 +122,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                     ConversacionLista(
                         mensajes = estado.mensajes,
                         generandoRespuesta = estado.generandoRespuesta,
+                        textoEnProgreso = estado.textoEnProgreso,
                         onEnviar = viewModel::enviarPregunta,
                         modifier = Modifier.weight(1f),
                     )
@@ -186,18 +211,35 @@ private fun etiquetaNivel(level: Level): String = when (level) {
 private fun ConversacionLista(
     mensajes: List<Mensaje>,
     generandoRespuesta: Boolean,
+    textoEnProgreso: String?,
     onEnviar: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    // Se desplaza solo hasta abajo cada vez que hay un mensaje nuevo o mientras
+    // se va revelando la respuesta — así siempre se ve lo último, incluso con
+    // el teclado abierto tapando parte de la pantalla.
+    LaunchedEffect(mensajes.size, textoEnProgreso) {
+        val total = mensajes.size + if (generandoRespuesta) 1 else 0
+        if (total > 0) listState.animateScrollToItem(total - 1)
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             items(mensajes) { mensaje -> BurbujaMensaje(mensaje) }
             if (generandoRespuesta) {
-                item { BurbujaEscribiendo() }
+                item {
+                    if (textoEnProgreso.isNullOrEmpty()) {
+                        BurbujaEscribiendo()
+                    } else {
+                        BurbujaTexto(textoEnProgreso)
+                    }
+                }
             }
         }
 
@@ -299,6 +341,24 @@ private fun AvisoCifraSinVerificar() {
                 "Cifra sin verificar. Consulta siempre la etiqueta registrada (ICA/EPA).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
+/** Burbuja del asistente mientras se "revela" el texto (ver nota en ChatViewModel). */
+@Composable
+private fun BurbujaTexto(texto: String) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+        Card(
+            modifier = Modifier.widthIn(max = 320.dp),
+            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 4.dp, bottomEnd = 18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        ) {
+            Text(
+                texto,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
         }
     }
