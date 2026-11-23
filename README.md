@@ -28,6 +28,75 @@
 
 ---
 
+## 💡 Resumen ejecutivo
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Exactitud%20benchmark-60.2%25%20(%2B11.1pp%20vs%20base)-1a73e8?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Detecci%C3%B3n%20patogeno%2Fplaga-84.6%25%20(base%3A%2057.7%25)-34a853?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Costo%20energ%C3%ADa%20entrenamiento-38%25%20menos%20que%20Qwen%201.5B-ea4335?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Tama%C3%B1o%20en%20el%20tel%C3%A9fono-771%20MB%20(Q4_K_M)-fbbc04?style=for-the-badge" /><br/>
+  <img src="https://img.shields.io/badge/Corpus%20propio-41.573%20documentos%20ES%2FEN-1a73e8?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Preguntas%20evaluadas-3.303%20(McNemar%2BHolm)-34a853?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/Costo%20marginal%20por%20consulta-%240%2C%20sin%20internet-ea4335?style=for-the-badge" />
+</p>
+
+**El problema:** los agricultores de maíz en Colombia y EE. UU. necesitan diagnóstico y manejo de
+enfermedades foliares en el campo, donde muchas veces no hay señal. Los chatbots genéricos (GPT, Gemini)
+no conocen los registros ICA/EPA, cuestan por consulta y no funcionan sin conexión.
+
+**La propuesta:** un modelo de 1.000 millones de parámetros, 500-1.000× más chico que los modelos de
+frontera, especializado con un corpus propio de 41.573 documentos (minado de OpenAlex, DSpace, Europe PMC
+y los registros oficiales ICA/EPA), que corre **dentro del teléfono del agricultor**: sin costo por
+consulta, sin depender de cobertura, sin exponer los datos del cultivo a un tercero.
+
+**La evidencia, no solo la promesa:**
+- El modelo especializado pasó de 49,1 % a 60,2 % de exactitud en un benchmark de opción múltiple de
+  3.303 preguntas, con significancia estadística confirmada (prueba de McNemar + corrección de Holm, no
+  solo "se ve mejor").
+- En la tarea más relevante para el producto — identificar el patógeno o la plaga — la exactitud subió de
+  57,7 % a **84,6 %**.
+- Empata en precisión con un modelo 50 % más grande (Qwen 2.5 1,5B) gastando **38 % menos energía** de
+  entrenamiento, lo que también se traduce en menos cómputo necesario para seguir iterando.
+- Cuantizado a 771 MB, cabe y corre en cualquier gama media de 6 GB de RAM en adelante.
+
+**Dónde está parado hoy, con transparencia (así es como un inversionista mide si el equipo es serio):**
+el modelo ya corre on-device (Fase 1 completada, ver "Estado actual"), pero antes de un lanzamiento público
+faltan tres cosas puntuales y acotadas: (1) verificar con evaluación experta la calidad de las respuestas
+sobre el modelo ya cuantizado, (2) un filtro de seguridad para dosis y fuentes citadas (ya detectamos y
+documentamos el riesgo concreto, ver "Riesgos conocidos" más abajo), y (3) la app Android terminada. Esa es
+la inversión que se busca destrabar.
+
+## 📊 Qué tan bien funciona, con el detalle completo
+
+<details>
+<summary><b>Desglose por categoría del benchmark (clic para expandir)</b> — dónde el modelo especializado gana más</summary>
+
+| Categoría | Preguntas | Modelo base | Modelo especializado (M2) | Mejora |
+|---|---|---|---|---|
+| Patógeno / plaga | 338 | 57,7 % | **84,6 %** | +26,9 pp |
+| Enfermedad | 557 | 56,9 % | **67,1 %** | +10,2 pp |
+| Cereales relacionados (transferencia) | 932 | 58,8 % | **71,7 %** | +12,9 pp |
+| Alcance maíz (específico) | 348 | 52,6 % | 65,2 % | +12,6 pp |
+| Ingrediente activo registrado (CO) | 300 | 45,3 % | 59,0 % | +13,7 pp |
+| Dosis en maíz (CO) | 347 | 36,0 % | 47,8 % | +11,8 pp |
+
+*(Tabla completa con las 10 categorías, incluidas dos que están por debajo del azar y requieren revisión,
+en la sección "Riesgos conocidos".)*
+
+</details>
+
+<details>
+<summary><b>Calidad de las respuestas tras el ajuste conversacional — 447 respuestas evaluadas</b></summary>
+
+| Métrica | Valor |
+|---|---|
+| Cita una fuente | 99,8 % |
+| Responde en el idioma pedido | 98,9 % |
+| Longitud promedio | 78,9 palabras (se adapta: 55 agricultor → 101 científico) |
+| Cifra sin respaldo en la referencia (riesgo) | 9,8 % |
+
+</details>
+
 ## 🚦 Estado actual
 
 <p align="left">
