@@ -68,6 +68,14 @@ la inversión que se busca destrabar.
 
 ## 📊 Qué tan bien funciona, con el detalle completo
 
+<p align="center">
+  <img src="assets/benchmark_por_familia.png" width="48%" alt="Exactitud en el benchmark por familia y etapa de entrenamiento" />
+  <img src="assets/eficiencia_energia_vs_exactitud.png" width="48%" alt="Energía de entrenamiento vs. exactitud" />
+</p>
+
+*(Gráficas generadas con `charts/generar_graficas.py` directamente desde las cifras de `resumen_colab.json`;
+el código queda en el repo para regenerarlas si cambian los datos.)*
+
 <details>
 <summary><b>Desglose por categoría del benchmark (clic para expandir)</b> — dónde el modelo especializado gana más</summary>
 
