@@ -115,11 +115,19 @@ ONNX_DIR = "/content/drive/MyDrive/maize_llm/runs/onnx/maize_llama32_1b_int4"
 
 # =========================================================================
 # Celda 9 — Copiar el GGUF a disco LOCAL de Colab (Drive montado por FUSE es
-# lento para leer archivos grandes la primera vez) y levantar llama-server.
+# lento para leer archivos grandes la primera vez) e instalar llama-cpp-python.
+#
+# CAMBIO DE RUMBO: dejamos de usar llama-server por HTTP. Esta version de
+# llama.cpp (1.0.0-dev) trae una interfaz de chat embebida que parece haber
+# reorganizado las rutas de la API (por eso /v1/chat/completions daba 404
+# aunque el servidor estuviera vivo). En vez de perseguir esa API, llamamos
+# al modelo directo desde Python con llama-cpp-python: mismo motor GGUF,
+# sin servidor, sin puertos, sin rutas que puedan cambiar entre versiones.
 # =========================================================================
-import os, shutil, subprocess, time
+import os, shutil
 
-# Si el runtime se reinicio y perdiste las variables de las celdas 1-8, usa la ruta por defecto.
+!pip install -q llama-cpp-python
+
 GGUF_DIR = globals().get("GGUF_DIR", "/content/drive/MyDrive/maize_llm/runs/gguf")
 MODEL_DRIVE = f"{GGUF_DIR}/maize_llama32_1b_Q4_K_M.gguf"
 MODEL_LOCAL = "/content/maize_llama32_1b_Q4_K_M.gguf"
@@ -129,42 +137,20 @@ if not os.path.exists(MODEL_LOCAL):
     shutil.copy(MODEL_DRIVE, MODEL_LOCAL)
 print(f"Modelo local listo: {os.path.getsize(MODEL_LOCAL) / 1e6:.0f} MB")
 
-SERVER_LOG = "/content/llama_server.log"
-server_proc = subprocess.Popen(
-    ["/content/llama.cpp/build/bin/llama-server",
-     "-m", MODEL_LOCAL,
-     "-c", "2048", "--host", "127.0.0.1", "--port", "8080"],
-    stdout=open(SERVER_LOG, "w"), stderr=subprocess.STDOUT,
+# =========================================================================
+# Celda 10 — Cargar el modelo directamente en este proceso de Python.
+# Tarda un poco la primera vez (carga ~770 MB a memoria); no hay que esperar
+# a ningun servidor ni verificar ningun puerto.
+# =========================================================================
+from llama_cpp import Llama
+
+llm = Llama(
+    model_path=MODEL_LOCAL,
+    n_ctx=2048,
+    n_threads=4,
+    verbose=False,
 )
-print("Arrancando servidor, PID:", server_proc.pid)
-
-# =========================================================================
-# Celda 10 — Esperar al servidor, con diagnostico automatico si algo falla.
-# Hasta 6 minutos (90 intentos x 4 s): la primera carga de un modelo puede tardar.
-# =========================================================================
-import requests
-
-listo = False
-for intento in range(90):
-    if server_proc.poll() is not None:
-        print(f"El proceso del servidor termino solo (codigo {server_proc.returncode}). Log:")
-        print(open(SERVER_LOG).read()[-3000:])
-        break
-    try:
-        if requests.get("http://127.0.0.1:8080/health", timeout=2).status_code == 200:
-            listo = True
-            break
-    except Exception:
-        pass
-    if intento % 10 == 0:
-        print(f"Esperando... {intento * 4} s")
-    time.sleep(4)
-
-if listo:
-    print("Servidor listo")
-else:
-    print("No quedo listo en 6 minutos. Ultimas lineas del log:")
-    print(open(SERVER_LOG).read()[-3000:])
+print("Modelo cargado en memoria, listo para generar.")
 
 # =========================================================================
 # Celda 10b (diagnostico opcional) — Confirmar la ruta del archivo de prueba.
@@ -208,15 +194,13 @@ DOSE_RE = re.compile(r"\d+[.,]?\d*\s*(L/ha|kg/ha|g/L|%|d[ii]as|days)", re.IGNORE
 CITA_RE = re.compile(r"(fuente|source)\s*:", re.IGNORECASE)
 
 def preguntar(system, user, max_tokens=320):
-    payload = {
-        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-        "temperature": 0.0,
-        "max_tokens": max_tokens,
-        "repeat_penalty": 1.1,
-    }
-    r = requests.post("http://127.0.0.1:8080/v1/chat/completions", json=payload, timeout=180)
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    resultado = llm.create_chat_completion(
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        temperature=0.0,
+        max_tokens=max_tokens,
+        repeat_penalty=1.1,
+    )
+    return resultado["choices"][0]["message"]["content"]
 
 with open(SFT_TEST_PATH, encoding="utf-8") as f:
     items = [json.loads(linea) for linea in f]
@@ -257,7 +241,8 @@ for i, item in enumerate(items):
 print("Evaluacion terminada. Resultados en:", RESULTS_PATH)
 
 # =========================================================================
-# Celda 12 — Resumen rapido y cierre del servidor
+# Celda 12 — Resumen rapido (no hay servidor que cerrar: el modelo vive en
+# la variable `llm` de este mismo proceso de Python).
 # =========================================================================
 import pandas as pd
 
@@ -266,6 +251,3 @@ if len(df):
     print(df.groupby(["lang", "level"])[["cita_fuente", "cifra_posible_sin_respaldo"]].mean())
 else:
     print("No hay resultados validos para resumir; revisa los errores en", RESULTS_PATH)
-
-server_proc.terminate()
-print("Servidor detenido.")
