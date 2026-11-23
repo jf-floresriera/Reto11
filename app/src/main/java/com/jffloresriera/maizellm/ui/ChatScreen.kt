@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -35,12 +36,15 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -63,6 +67,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jffloresriera.maizellm.R
+import com.jffloresriera.maizellm.data.Tema
 import com.jffloresriera.maizellm.domain.Lang
 import com.jffloresriera.maizellm.domain.Level
 
@@ -83,15 +88,27 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
 
     var menuAbierto by remember { mutableStateOf(false) }
     var dialogoAcercaDeAbierto by remember { mutableStateOf(false) }
+    var dialogoConfigAbierto by remember { mutableStateOf(false) }
 
     if (dialogoAcercaDeAbierto) {
         DialogoAcercaDe(onCerrar = { dialogoAcercaDeAbierto = false })
+    }
+    if (dialogoConfigAbierto) {
+        DialogoConfiguracion(
+            mostrarMetricas = estado.mostrarMetricas,
+            sonidoActivado = estado.sonidoActivado,
+            tema = estado.tema,
+            onMostrarMetricasChange = viewModel::cambiarMostrarMetricas,
+            onSonidoChange = viewModel::cambiarSonido,
+            onTemaChange = viewModel::cambiarTema,
+            onCerrar = { dialogoConfigAbierto = false },
+        )
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Maíz IA", style = MaterialTheme.typography.titleLarge) },
+                title = { Text("Agro IA", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     Icon(
                         painter = painterResource(R.drawable.ic_launcher_foreground),
@@ -109,6 +126,11 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                             text = { Text("Acerca de") },
                             leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
                             onClick = { menuAbierto = false; dialogoAcercaDeAbierto = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Configuración") },
+                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                            onClick = { menuAbierto = false; dialogoConfigAbierto = true },
                         )
                         DropdownMenuItem(
                             text = { Text("Compartir conversación") },
@@ -165,6 +187,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         mensajes = estado.mensajes,
                         generandoRespuesta = estado.generandoRespuesta,
                         textoEnProgreso = estado.textoEnProgreso,
+                        mostrarMetricas = estado.mostrarMetricas,
                         onEnviar = viewModel::enviarPregunta,
                         modifier = Modifier.weight(1f),
                     )
@@ -177,7 +200,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
 private fun DialogoAcercaDe(onCerrar: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCerrar,
-        title = { Text("Acerca de Maíz IA") },
+        title = { Text("Acerca de Agro IA") },
         text = {
             Column {
                 Text(
@@ -202,6 +225,65 @@ private fun DialogoAcercaDe(onCerrar: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onCerrar) { Text("Cerrar") } },
     )
+}
+
+@Composable
+private fun DialogoConfiguracion(
+    mostrarMetricas: Boolean,
+    sonidoActivado: Boolean,
+    tema: Tema,
+    onMostrarMetricasChange: (Boolean) -> Unit,
+    onSonidoChange: (Boolean) -> Unit,
+    onTemaChange: (Tema) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("Configuración") },
+        text = {
+            Column {
+                FilaInterruptor(
+                    etiqueta = "Mostrar métricas de generación",
+                    activado = mostrarMetricas,
+                    onCambio = onMostrarMetricasChange,
+                )
+                FilaInterruptor(
+                    etiqueta = "Sonido al terminar la respuesta",
+                    activado = sonidoActivado,
+                    onCambio = onSonidoChange,
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                Text("Tema", style = MaterialTheme.typography.bodyMedium)
+                FilaTema("Igual que el sistema", Tema.SISTEMA, tema, onTemaChange)
+                FilaTema("Claro", Tema.CLARO, tema, onTemaChange)
+                FilaTema("Oscuro", Tema.OSCURO, tema, onTemaChange)
+            }
+        },
+        confirmButton = { TextButton(onClick = onCerrar) { Text("Cerrar") } },
+    )
+}
+
+@Composable
+private fun FilaInterruptor(etiqueta: String, activado: Boolean, onCambio: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(etiqueta, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = activado, onCheckedChange = onCambio)
+    }
+}
+
+@Composable
+private fun FilaTema(etiqueta: String, valor: Tema, seleccionado: Tema, onSeleccionar: (Tema) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = valor == seleccionado, onClick = { onSeleccionar(valor) })
+        Text(etiqueta, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 @Composable
@@ -285,6 +367,7 @@ private fun ConversacionLista(
     mensajes: List<Mensaje>,
     generandoRespuesta: Boolean,
     textoEnProgreso: String?,
+    mostrarMetricas: Boolean,
     onEnviar: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -304,7 +387,7 @@ private fun ConversacionLista(
             contentPadding = PaddingValues(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(mensajes) { mensaje -> BurbujaMensaje(mensaje) }
+            items(mensajes) { mensaje -> BurbujaMensaje(mensaje, mostrarMetricas) }
             if (generandoRespuesta) {
                 item {
                     if (textoEnProgreso.isNullOrEmpty()) {
@@ -353,7 +436,7 @@ private fun ConversacionLista(
 }
 
 @Composable
-private fun BurbujaMensaje(mensaje: Mensaje) {
+private fun BurbujaMensaje(mensaje: Mensaje, mostrarMetricas: Boolean) {
     val esUsuario = mensaje.autor == Autor.USUARIO
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -389,6 +472,18 @@ private fun BurbujaMensaje(mensaje: Mensaje) {
                 }
                 if (!esUsuario && mensaje.cifraSinVerificar) {
                     AvisoCifraSinVerificar()
+                }
+                if (!esUsuario && mostrarMetricas && mensaje.tokensGenerados != null) {
+                    Text(
+                        "${mensaje.tokensGenerados} tokens · " +
+                            "%.1f tok/s · %.1f s".format(
+                                mensaje.tokensPorSegundo ?: 0f,
+                                (mensaje.tiempoGeneracionMs ?: 0L) / 1000f,
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
         }

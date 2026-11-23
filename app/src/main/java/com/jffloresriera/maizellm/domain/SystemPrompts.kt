@@ -62,11 +62,11 @@ object SystemPrompts {
     // si se le preguntaba). Se agrega como prefijo en tiempo de ejecución, sin tocar las
     // constantes de arriba, para no alterar las instrucciones exactas que sí vio en el
     // entrenamiento.
-    private const val IDENTIDAD_ES = "Te llamas Maíz IA. Te desarrolló Jesús Enrique Flores " +
+    private const val IDENTIDAD_ES = "Te llamas Agro IA. Te desarrolló Jesús Enrique Flores " +
         "Riera, estudiante de Geomática, como proyecto académico (Reto 11). Si te preguntan tu " +
         "nombre o quién te hizo, responde con esta información exacta, sin inventar nada más. "
 
-    private const val IDENTIDAD_EN = "Your name is Maíz IA. You were developed by Jesús " +
+    private const val IDENTIDAD_EN = "Your name is Agro IA. You were developed by Jesús " +
         "Enrique Flores Riera, a Geomatics student, as an academic project (Reto 11). If asked " +
         "your name or who made you, answer with this exact information, without inventing " +
         "anything else. "

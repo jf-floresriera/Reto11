@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.jffloresriera.maizellm.data.Tema
 
 // Paleta propia del proyecto (ver Color.kt), consistente con el README y las gráficas.
 // Si más adelante se compara con el estilo de otra app de referencia, solo hay que
@@ -38,10 +39,15 @@ private val EsquemaOscuro = darkColorScheme(
 
 @Composable
 fun MaizeLlmTheme(
-    useDarkTheme: Boolean = isSystemInDarkTheme(),
+    tema: Tema = Tema.SISTEMA,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (useDarkTheme) EsquemaOscuro else EsquemaClaro
+    val usarOscuro = when (tema) {
+        Tema.SISTEMA -> isSystemInDarkTheme()
+        Tema.CLARO -> false
+        Tema.OSCURO -> true
+    }
+    val colorScheme = if (usarOscuro) EsquemaOscuro else EsquemaClaro
     MaterialTheme(
         colorScheme = colorScheme,
         content = content,

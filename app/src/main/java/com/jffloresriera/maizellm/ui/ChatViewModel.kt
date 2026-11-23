@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.jffloresriera.maizellm.data.InstallProgress
 import com.jffloresriera.maizellm.data.ModelAssetInstaller
 import com.jffloresriera.maizellm.data.ModelRepository
+import com.jffloresriera.maizellm.data.Preferencias
+import com.jffloresriera.maizellm.data.Tema
 import com.jffloresriera.maizellm.domain.Citas
 import com.jffloresriera.maizellm.domain.DoseGuardrail
 import com.jffloresriera.maizellm.domain.Lang
@@ -29,6 +31,11 @@ data class Mensaje(
     val referencias: List<String> = emptyList(),
     val cifraSinVerificar: Boolean = false,
     val citaFuente: Boolean = false,
+    // Métricas de generación (tiempo/velocidad), solo presentes en mensajes del
+    // asistente. Vienen directo del motor de inferencia, no son estimadas.
+    val tokensGenerados: Int? = null,
+    val tokensPorSegundo: Float? = null,
+    val tiempoGeneracionMs: Long? = null,
 )
 
 sealed interface EstadoModelo {
@@ -49,18 +56,30 @@ data class ChatUiState(
     // generar la respuesta completa (ver nota en enviarPregunta: no es streaming
     // real del modelo, es una animación de "tecleo" sobre la respuesta ya lista).
     val textoEnProgreso: String? = null,
+    // Preferencias del usuario: todas empiezan en un valor por defecto razonable,
+    // pero el usuario puede cambiarlas; se guardan en SharedPreferences.
+    val mostrarMetricas: Boolean = false,
+    val sonidoActivado: Boolean = true,
+    val tema: Tema = Tema.SISTEMA,
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val installer = ModelAssetInstaller(application)
     private val repository = ModelRepository()
+    private val preferencias = Preferencias(application)
 
-    private val _uiState = MutableStateFlow(ChatUiState())
+    private val _uiState = MutableStateFlow(
+        ChatUiState(
+            mostrarMetricas = preferencias.mostrarMetricas,
+            sonidoActivado = preferencias.sonidoActivado,
+            tema = preferencias.tema,
+        ),
+    )
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     // Evento de "sonido" (ver nota en ChatScreen): se dispara cuando la respuesta
-    // ya quedó completa, para que la UI reproduzca un tono corto.
+    // ya quedó completa, para que la UI reproduzca un tono corto (si está activado).
     private val _eventosSonido = Channel<Unit>(Channel.CONFLATED)
     val eventosSonido: Flow<Unit> = _eventosSonido.receiveAsFlow()
 
@@ -98,6 +117,21 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun cambiarNivel(level: Level) = _uiState.update { it.copy(level = level) }
 
+    fun cambiarMostrarMetricas(valor: Boolean) {
+        preferencias.mostrarMetricas = valor
+        _uiState.update { it.copy(mostrarMetricas = valor) }
+    }
+
+    fun cambiarSonido(valor: Boolean) {
+        preferencias.sonidoActivado = valor
+        _uiState.update { it.copy(sonidoActivado = valor) }
+    }
+
+    fun cambiarTema(valor: Tema) {
+        preferencias.tema = valor
+        _uiState.update { it.copy(tema = valor) }
+    }
+
     fun enviarPregunta(pregunta: String) {
         if (pregunta.isBlank() || _uiState.value.estadoModelo != EstadoModelo.Listo) return
 
@@ -116,7 +150,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // completa llega de una sola vez aquí. Lo que sigue (revelarEnPantalla)
                 // es solo una animación visual sobre el texto ya generado.
                 val resultado = repository.preguntar(systemPrompt, pregunta)
-                revelarEnPantalla(resultado.text)
+                revelarEnPantalla(
+                    textoCompleto = resultado.text,
+                    tokensGenerados = resultado.tokensGenerated,
+                    tokensPorSegundo = resultado.tokensPerSecond,
+                    tiempoGeneracionMs = resultado.generateTimeMs,
+                )
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -135,9 +174,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Simula el efecto de "tecleo" revelando el texto ya generado de a pocos
      * caracteres, en vez de mostrarlo todo de golpe. Al terminar, lo convierte
-     * en un Mensaje definitivo con las señales de riesgo ya calculadas.
+     * en un Mensaje definitivo con las señales de riesgo y las métricas de
+     * generación ya calculadas.
      */
-    private suspend fun revelarEnPantalla(textoCompleto: String) {
+    private suspend fun revelarEnPantalla(
+        textoCompleto: String,
+        tokensGenerados: Int,
+        tokensPorSegundo: Float,
+        tiempoGeneracionMs: Long,
+    ) {
         val tamanoBloque = 3
         var i = 0
         while (i < textoCompleto.length) {
@@ -154,29 +199,44 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     referencias = referencias,
                     cifraSinVerificar = DoseGuardrail.containsUnverifiedFigure(textoCompleto),
                     citaFuente = referencias.isNotEmpty(),
+                    tokensGenerados = tokensGenerados,
+                    tokensPorSegundo = tokensPorSegundo,
+                    tiempoGeneracionMs = tiempoGeneracionMs,
                 ),
                 generandoRespuesta = false,
                 textoEnProgreso = null,
             )
         }
-        _eventosSonido.trySend(Unit)
+        if (_uiState.value.sonidoActivado) {
+            _eventosSonido.trySend(Unit)
+        }
     }
 
     fun borrarConversacion() = _uiState.update { it.copy(mensajes = emptyList()) }
 
     /** Texto plano de toda la conversación, para compartir o descargar. */
     fun construirTranscripcion(): String {
-        val mensajes = _uiState.value.mensajes
-        if (mensajes.isEmpty()) return "Todavía no hay conversación con Maíz IA."
+        val estado = _uiState.value
+        val mensajes = estado.mensajes
+        if (mensajes.isEmpty()) return "Todavía no hay conversación con Agro IA."
         return buildString {
-            appendLine("Conversación con Maíz IA")
+            appendLine("Conversación con Agro IA")
+            appendLine("Idioma: ${etiquetaIdioma(estado.lang)} · Nivel: ${etiquetaNivelTranscripcion(estado.level)}")
             appendLine()
             mensajes.forEach { m ->
-                appendLine(if (m.autor == Autor.USUARIO) "Tú:" else "Maíz IA:")
+                appendLine(if (m.autor == Autor.USUARIO) "Tú:" else "Agro IA:")
                 appendLine(m.texto)
                 appendLine()
             }
         }
+    }
+
+    private fun etiquetaIdioma(lang: Lang): String = if (lang == Lang.ES) "Español" else "Inglés"
+
+    private fun etiquetaNivelTranscripcion(level: Level): String = when (level) {
+        Level.AGRICULTOR -> "Agricultor"
+        Level.TECNICO -> "Técnico"
+        Level.CIENTIFICO -> "Científico"
     }
 
     override fun onCleared() {
