@@ -9,25 +9,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -129,75 +128,49 @@ private fun SelectorIdiomaYNivel(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        var idiomaExpandido by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = idiomaExpandido,
-            onExpandedChange = { idiomaExpandido = it },
+        SelectorDesplegable(
+            etiquetaActual = if (lang == Lang.ES) "Español" else "English",
+            opciones = Lang.entries.map { it to (if (it == Lang.ES) "Español" else "English") },
+            onSeleccionar = onLangChange,
             modifier = Modifier.weight(1f),
-        ) {
-            TextField(
-                readOnly = true,
-                value = if (lang == Lang.ES) "Español" else "English",
-                onValueChange = {},
-                label = { Text("Idioma") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = idiomaExpandido) },
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                ),
-                // menuAnchor() sin argumentos: así se llama en el BOM fijado en build.gradle.kts.
-                // Versiones más nuevas de Material3 la marcan "deprecated" a favor de
-                // menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled) — si
-                // Android Studio sugiere ese cambio al compilar, es seguro aceptarlo.
-                modifier = Modifier.menuAnchor(),
-            )
-            ExposedDropdownMenu(
-                expanded = idiomaExpandido,
-                onDismissRequest = { idiomaExpandido = false },
-            ) {
-                Lang.entries.forEach { opcion ->
-                    DropdownMenuItem(
-                        text = { Text(if (opcion == Lang.ES) "Español" else "English") },
-                        onClick = { onLangChange(opcion); idiomaExpandido = false },
-                    )
-                }
-            }
-        }
+        )
+        SelectorDesplegable(
+            etiquetaActual = etiquetaNivel(level),
+            opciones = Level.entries.map { it to etiquetaNivel(it) },
+            onSeleccionar = onLevelChange,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 
-        var nivelExpandido by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = nivelExpandido,
-            onExpandedChange = { nivelExpandido = it },
-            modifier = Modifier.weight(1f),
+/**
+ * Selector simple con un botón que abre un DropdownMenu (API de nivel superior, estable,
+ * sin la ambigüedad de scope de ExposedDropdownMenuBox). Genérico en T para reusarlo con
+ * Lang y Level.
+ */
+@Composable
+private fun <T> SelectorDesplegable(
+    etiquetaActual: String,
+    opciones: List<Pair<T, String>>,
+    onSeleccionar: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expandido by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedButton(
+            onClick = { expandido = true },
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            TextField(
-                readOnly = true,
-                value = etiquetaNivel(level),
-                onValueChange = {},
-                label = { Text("Nivel") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = nivelExpandido) },
-                shape = RoundedCornerShape(16.dp),
-                colors = TextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    focusedIndicatorColor = Color.Transparent,
-                ),
-                modifier = Modifier.menuAnchor(),
-            )
-            ExposedDropdownMenu(
-                expanded = nivelExpandido,
-                onDismissRequest = { nivelExpandido = false },
-            ) {
-                Level.entries.forEach { opcion ->
-                    DropdownMenuItem(
-                        text = { Text(etiquetaNivel(opcion)) },
-                        onClick = { onLevelChange(opcion); nivelExpandido = false },
-                    )
-                }
+            Text(etiquetaActual, modifier = Modifier.weight(1f))
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+            opciones.forEach { (valor, etiqueta) ->
+                DropdownMenuItem(
+                    text = { Text(etiqueta) },
+                    onClick = { onSeleccionar(valor); expandido = false },
+                )
             }
         }
     }
