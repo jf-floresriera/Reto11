@@ -559,18 +559,20 @@ private fun BurbujaTexto(texto: String) {
     }
 }
 
-// Datos y curiosidades sobre maíz/agronomía/ciencia, para que la espera (puede
-// tardar bastante en CPU de celular) se sienta más entretenida que un simple
-// "Escribiendo…". Van rotando con un efecto de desvanecido (Crossfade).
+// Datos sobre maíz/agronomía/ciencia, para que la espera (puede tardar bastante
+// en CPU de celular) sea más informativa que un simple "Escribiendo…". Tono
+// formal, acorde con el resto de la app (no es un chatbot casual): nada de
+// conexión a ninguna API, todo corre local. Rotan con un desvanecido (Crossfade),
+// con suficiente tiempo en pantalla para poder leerlos completos.
 private val MENSAJES_ESPERA = listOf(
-    "🌱 El maíz se domesticó hace más de 9.000 años en México.",
-    "🔬 Este modelo se entrenó con más de 41.000 documentos científicos.",
-    "🌾 Colombia tiene una enorme diversidad de maíces nativos.",
-    "💡 Agro IA corre 100% en tu celular, sin necesitar internet.",
-    "📚 La ciencia agrícola ayuda a alimentar a millones de personas.",
-    "🧬 El maíz tiene uno de los genomas más grandes entre los cereales.",
-    "🚜 El manejo integrado de plagas reduce el uso de agroquímicos.",
-    "🎓 Cada pregunta que haces ayuda a entender mejor estas herramientas.",
+    "El maíz se domesticó hace aproximadamente 9.000 años en Mesoamérica.",
+    "Este modelo se entrenó con más de 41.000 documentos científicos sobre sanidad vegetal.",
+    "Colombia presenta una amplia diversidad de maíces nativos.",
+    "Este asistente procesa la información directamente en el dispositivo, sin conexión a internet.",
+    "La investigación en sanidad vegetal contribuye a la seguridad alimentaria.",
+    "El maíz posee uno de los genomas más extensos entre los cereales cultivados.",
+    "El manejo integrado de plagas reduce la dependencia de agroquímicos.",
+    "La calidad de las respuestas depende del entrenamiento del modelo: verifique siempre la información crítica.",
 )
 
 @Composable
@@ -578,7 +580,7 @@ private fun BurbujaEscribiendo() {
     var indice by remember { mutableStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            delay(3200)
+            delay(4500)
             indice = (indice + 1) % MENSAJES_ESPERA.size
         }
     }
