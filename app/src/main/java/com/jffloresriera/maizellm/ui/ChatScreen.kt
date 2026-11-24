@@ -561,27 +561,78 @@ private fun BurbujaTexto(texto: String) {
 
 // Datos sobre maíz/agronomía/ciencia, para que la espera (puede tardar bastante
 // en CPU de celular) sea más informativa que un simple "Escribiendo…". Tono
-// formal, acorde con el resto de la app (no es un chatbot casual): nada de
-// conexión a ninguna API, todo corre local. Rotan con un desvanecido (Crossfade),
-// con suficiente tiempo en pantalla para poder leerlos completos.
+// formal, acorde con el resto de la app. Son hechos reales (varios ya
+// verificados en el documento de contexto del proyecto, no inventados para
+// "rellenar"). Salen en orden aleatorio (sin repetir dos veces seguidas) para
+// que no se note un patrón fijo al usar la app varias veces.
 private val MENSAJES_ESPERA = listOf(
-    "El maíz se domesticó hace aproximadamente 9.000 años en Mesoamérica.",
-    "Este modelo se entrenó con más de 41.000 documentos científicos sobre sanidad vegetal.",
-    "Colombia presenta una amplia diversidad de maíces nativos.",
-    "Este asistente procesa la información directamente en el dispositivo, sin conexión a internet.",
-    "La investigación en sanidad vegetal contribuye a la seguridad alimentaria.",
+    // Historia y origen
+    "El maíz es originario de Mesoamérica, domesticado a partir de una gramínea silvestre llamada teocintle.",
+    "El maíz llegó a Europa en el siglo XVI, tras la llegada de los españoles a América.",
+    "Antes de la llegada de los europeos, el maíz ya era la base de la alimentación en gran parte de América.",
+    "El nombre científico del maíz es Zea mays.",
+    "El maíz pertenece a la familia de las gramíneas, igual que el trigo, el arroz y la caña de azúcar.",
+    // Biología y genética
+    "El maíz es una planta de polinización cruzada: el viento transporta el polen de una planta a otra.",
+    "Cada mazorca de maíz puede tener cientos de granos, cada uno resultado de una fecundación independiente.",
     "El maíz posee uno de los genomas más extensos entre los cereales cultivados.",
-    "El manejo integrado de plagas reduce la dependencia de agroquímicos.",
-    "La calidad de las respuestas depende del entrenamiento del modelo: verifique siempre la información crítica.",
+    "Existen miles de variedades de maíz adaptadas a distintos climas y altitudes.",
+    "El maíz puede cultivarse desde el nivel del mar hasta más de 3.000 metros de altitud.",
+    "El color de los granos de maíz depende de pigmentos como antocianinas y carotenoides.",
+    "El maíz morado debe su color a un alto contenido de antocianinas.",
+    // Agronomía y cultivo
+    "El maíz necesita temperaturas superiores a 10 °C para germinar adecuadamente.",
+    "La densidad de siembra del maíz varía según la variedad y el objetivo de producción.",
+    "El maíz es sensible al estrés hídrico, especialmente durante la floración.",
+    "La rotación de cultivos ayuda a reducir la acumulación de plagas y enfermedades en el suelo.",
+    "El manejo integrado de plagas combina métodos biológicos, culturales y químicos.",
+    "La aplicación oportuna de fertilizantes nitrogenados es clave para el rendimiento del maíz.",
+    "El maíz responde bien a suelos francos, profundos y bien drenados.",
+    "La siembra directa ayuda a conservar la humedad y reducir la erosión del suelo.",
+    "El monitoreo temprano de plagas y enfermedades reduce las pérdidas en el cultivo.",
+    "La rotación con leguminosas puede mejorar la disponibilidad de nitrógeno en el suelo.",
+    // Enfermedades y sanidad
+    "La mancha de asfalto del maíz es causada por el hongo Phyllachora maydis.",
+    "El tizón del norte del maíz es causado por el hongo Exserohilum turcicum.",
+    "La roya común del maíz es causada por el hongo Puccinia sorghi.",
+    "La alta humedad y las temperaturas moderadas favorecen muchas enfermedades foliares del maíz.",
+    "La identificación temprana de enfermedades foliares permite tomar decisiones de manejo más efectivas.",
+    // Producción y uso
+    "El maíz, el trigo y el arroz son los tres cereales más cultivados del mundo.",
+    "El maíz se usa para consumo humano, alimento animal y procesos industriales.",
+    "El almidón de maíz se usa en la industria alimentaria, farmacéutica y de papel.",
+    "El maíz es materia prima para producir etanol como biocombustible.",
+    "Colombia cultiva maíz en climas muy distintos, desde zonas cálidas hasta de clima frío.",
+    "El maíz forma parte de la dieta tradicional en gran parte de América Latina.",
+    // Tecnología y agricultura de precisión
+    "La agricultura de precisión usa sensores, drones e imágenes satelitales para monitorear los cultivos.",
+    "Los modelos de inteligencia artificial pueden apoyar la identificación de enfermedades a partir de imágenes de hojas.",
+    "El uso de datos climáticos históricos ayuda a planear mejor las fechas de siembra.",
+    "El riego por goteo permite un uso más eficiente del agua en cultivos exigentes.",
+    // Sobre este proyecto
+    "Este modelo se entrenó con un corpus de más de 41.000 documentos en español e inglés.",
+    "El modelo que usa esta app tiene 1.000 millones de parámetros.",
+    "Reducir el tamaño del modelo permite que corra directamente en un teléfono celular.",
+    "El modelo fue ajustado para responder en tres niveles: agricultor, técnico y científico.",
+    "Toda la inferencia de este chatbot ocurre en el propio dispositivo, sin conexión a internet.",
+    "La cuantización reduce el tamaño del modelo conservando la mayor parte de su capacidad.",
+    // Seguridad alimentaria y contexto
+    "La sanidad vegetal es clave para reducir pérdidas de cosecha y aportar a la seguridad alimentaria.",
+    "El acceso oportuno a información agronómica confiable puede mejorar la toma de decisiones en campo.",
+    "Las etiquetas de los productos fitosanitarios indican las dosis autorizadas y las medidas de seguridad.",
+    "En Colombia, el ICA regula el registro y uso de productos para la protección de cultivos.",
+    "En Estados Unidos, la EPA regula el registro de plaguicidas y productos fitosanitarios.",
+    "Verificar siempre la etiqueta oficial de un producto es la forma más segura de conocer su dosis correcta.",
+    "La ciencia agrícola combina biología, química, suelos y clima para mejorar la producción de alimentos.",
 )
 
 @Composable
 private fun BurbujaEscribiendo() {
-    var indice by remember { mutableStateOf(0) }
+    var indice by remember { mutableStateOf(MENSAJES_ESPERA.indices.random()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(4500)
-            indice = (indice + 1) % MENSAJES_ESPERA.size
+            indice = MENSAJES_ESPERA.indices.filter { it != indice }.random()
         }
     }
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
