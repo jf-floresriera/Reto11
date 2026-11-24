@@ -190,6 +190,7 @@ fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
                         generandoRespuesta = estado.generandoRespuesta,
                         textoEnProgreso = estado.textoEnProgreso,
                         mostrarMetricas = estado.mostrarMetricas,
+                        lang = estado.lang,
                         onEnviar = viewModel::enviarPregunta,
                         modifier = Modifier.weight(1f),
                     )
@@ -370,6 +371,7 @@ private fun ConversacionLista(
     generandoRespuesta: Boolean,
     textoEnProgreso: String?,
     mostrarMetricas: Boolean,
+    lang: Lang,
     onEnviar: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -393,7 +395,7 @@ private fun ConversacionLista(
             if (generandoRespuesta) {
                 item {
                     if (textoEnProgreso.isNullOrEmpty()) {
-                        BurbujaEscribiendo()
+                        BurbujaEscribiendo(lang)
                     } else {
                         BurbujaTexto(textoEnProgreso)
                     }
@@ -565,7 +567,7 @@ private fun BurbujaTexto(texto: String) {
 // verificados en el documento de contexto del proyecto, no inventados para
 // "rellenar"). Salen en orden aleatorio (sin repetir dos veces seguidas) para
 // que no se note un patrón fijo al usar la app varias veces.
-private val MENSAJES_ESPERA = listOf(
+private val MENSAJES_ESPERA_ES = listOf(
     // Historia y origen
     "El maíz es originario de Mesoamérica, domesticado a partir de una gramínea silvestre llamada teocintle.",
     "El maíz llegó a Europa en el siglo XVI, tras la llegada de los españoles a América.",
@@ -679,13 +681,133 @@ private val MENSAJES_ESPERA = listOf(
     "La divulgación científica ayuda a que los avances agronómicos lleguen a quienes trabajan la tierra.",
 )
 
+// Mismos 100 datos, en inglés (misma intención del usuario: debe verse en el
+// idioma activo del chat, no solo en español).
+private val MENSAJES_ESPERA_EN = listOf(
+    // History and origin
+    "Maize is native to Mesoamerica, domesticated from a wild grass called teosinte.",
+    "Maize arrived in Europe in the 16th century, after the Spanish arrived in America.",
+    "Before Europeans arrived, maize was already the basis of the diet across much of the Americas.",
+    "The scientific name of maize is Zea mays.",
+    "Maize belongs to the grass family, along with wheat, rice, and sugarcane.",
+    // Biology and genetics
+    "Maize is a cross-pollinating plant: wind carries pollen from one plant to another.",
+    "Each maize ear can hold hundreds of kernels, each the result of an independent fertilization.",
+    "Maize has one of the largest genomes among cultivated cereals.",
+    "There are thousands of maize varieties adapted to different climates and altitudes.",
+    "Maize can be grown from sea level up to more than 3,000 meters of altitude.",
+    "The color of maize kernels comes from pigments such as anthocyanins and carotenoids.",
+    "Purple maize owes its color to a high content of anthocyanins.",
+    // Agronomy and cultivation
+    "Maize needs temperatures above 10 °C (50 °F) to germinate properly.",
+    "Planting density for maize varies depending on the variety and the production goal.",
+    "Maize is sensitive to water stress, especially during flowering.",
+    "Crop rotation helps reduce the buildup of pests and diseases in the soil.",
+    "Integrated pest management combines biological, cultural, and chemical methods.",
+    "Timely nitrogen fertilization is key to maize yield.",
+    "Maize grows well in deep, well-drained loamy soils.",
+    "No-till planting helps conserve soil moisture and reduce erosion.",
+    "Early monitoring of pests and diseases reduces crop losses.",
+    "Rotating with legumes can improve nitrogen availability in the soil.",
+    // Diseases and plant health
+    "Tar spot of maize is caused by the fungus Phyllachora maydis.",
+    "Northern corn leaf blight is caused by the fungus Exserohilum turcicum.",
+    "Common rust of maize is caused by the fungus Puccinia sorghi.",
+    "High humidity and moderate temperatures favor many maize foliar diseases.",
+    "Early identification of foliar diseases allows for more effective management decisions.",
+    // Production and use
+    "Maize, wheat, and rice are the three most widely grown cereals in the world.",
+    "Maize is used for human consumption, animal feed, and industrial processes.",
+    "Corn starch is used in the food, pharmaceutical, and paper industries.",
+    "Maize is a raw material for producing ethanol as a biofuel.",
+    "Colombia grows maize across very different climates, from warm lowlands to cold highlands.",
+    "Maize is part of the traditional diet across much of Latin America.",
+    // Technology and precision agriculture
+    "Precision agriculture uses sensors, drones, and satellite imagery to monitor crops.",
+    "AI models can support the identification of diseases from images of leaves.",
+    "Historical climate data helps plan better planting dates.",
+    "Drip irrigation allows more efficient water use in demanding crops.",
+    // About this project
+    "This model was trained on a corpus of more than 41,000 documents in Spanish and English.",
+    "The model used in this app has 1 billion parameters.",
+    "Shrinking the model lets it run directly on a mobile phone.",
+    "The model was fine-tuned to answer at three levels: farmer, technician, and researcher.",
+    "All inference in this chatbot happens on the device itself, with no internet connection.",
+    "Quantization reduces the size of the model while keeping most of its capability.",
+    // Food security and context
+    "Plant health is key to reducing crop losses and supporting food security.",
+    "Timely access to reliable agronomic information can improve decisions in the field.",
+    "Pesticide labels state the authorized doses and safety measures.",
+    "In Colombia, ICA regulates the registration and use of crop protection products.",
+    "In the United States, the EPA regulates the registration of pesticides.",
+    "Always checking the official label is the safest way to know the correct dose.",
+    "Agricultural science combines biology, chemistry, soil, and climate to improve food production.",
+    // Agronomy scientists
+    "Norman Borlaug, father of the Green Revolution, received the Nobel Peace Prize in 1970.",
+    "Norman Borlaug developed high-yield wheat varieties that helped prevent famines.",
+    "George Washington Carver promoted crop rotation to restore soils depleted by cotton.",
+    "Gregor Mendel, the father of genetics, based his laws of heredity on experiments with pea plants.",
+    "Barbara McClintock received the Nobel Prize in Medicine in 1983 for her studies on maize genetics.",
+    "Barbara McClintock discovered \"jumping genes\" (transposons) by studying maize ears.",
+    "Luther Burbank developed hundreds of new plant varieties through selection and crossbreeding.",
+    "The World Food Prize recognizes those who have helped improve the availability of food.",
+    // Institutions and research sites
+    "CIMMYT (the International Maize and Wheat Improvement Center) is headquartered in Mexico.",
+    "CIMMYT maintains one of the largest maize and wheat seed banks in the world.",
+    "CGIAR is a global alliance of agricultural research centers dedicated to food security.",
+    "AGROSAVIA is the Colombian corporation in charge of agricultural research in the country.",
+    "The National University of Colombia has faculties dedicated to agronomic research.",
+    "CGSpace is a digital repository that gathers agricultural research from CGIAR centers.",
+    "IICA supports cooperation and agricultural development across the Americas.",
+    "The FAO, part of the United Nations, promotes food security worldwide.",
+    "ICA regulates agricultural health and the registration of farm inputs in Colombia.",
+    "The EPA regulates the use of pesticides and crop protection products in the United States.",
+    "IRRI (the International Rice Research Institute), in the Philippines, works on rice breeding.",
+    "The Green Revolution of the 20th century significantly increased world food production.",
+    // Agronomic science in general
+    "Many maize breeding programs cross pure lines to produce more productive hybrids.",
+    "\"Hybrid vigor\" explains why maize hybrids often outyield their parent lines.",
+    "Agroecology studies crops by integrating soil, climate, and biodiversity.",
+    "Soil science (edaphology) studies soil and its fertility.",
+    "Plant pathology is the branch of science that studies plant diseases.",
+    "Agricultural entomology studies the insects that affect or benefit crops.",
+    "Germplasm banks preserve seeds from thousands of varieties to protect genetic diversity.",
+    "Participatory breeding involves farmers themselves in selecting new varieties.",
+    "Agricultural biotechnology ranges from tissue culture to gene editing in plants.",
+    "Experimental research stations allow new varieties to be tested under real field conditions.",
+    "Data science is now used to analyze agronomic and climate information at large scale.",
+    "Rural extension programs aim to bring scientific knowledge to farming communities.",
+    "International agricultural research often shares improved varieties between countries.",
+    "Plant physiology studies how plants respond to water and heat stress.",
+    "Modern agronomy combines biology, chemistry, physics, and statistics.",
+    "Field trials compare how different varieties perform under the same conditions.",
+    "Plant nutrition research seeks to optimize fertilizer use without harming the environment.",
+    "Studying climate change is increasingly important for planning the agriculture of the future.",
+    "Agricultural scientists work together with field agronomists to validate findings in practice.",
+    "Pollinator conservation, such as for bees, is a growing focus of agricultural research.",
+    "Urban agriculture is also studied scientifically as a food security strategy.",
+    "Many scientific journals publish research on agronomy and plant pathology.",
+    "International scientific collaboration has been key to tackling global maize pests and diseases.",
+    "Universities with agronomy faculties train the professionals who research crops.",
+    "Genomic selection uses DNA markers to speed up crop breeding.",
+    "Disease prediction models help anticipate outbreaks before they spread.",
+    "Post-harvest research aims to reduce grain losses after harvest.",
+    "Seed certification guarantees the genetic and sanitary quality of what is planted.",
+    "International scientific cooperation has allowed germplasm banks to be shared between countries.",
+    "Science communication helps agronomic advances reach the people who work the land.",
+)
+
+private fun mensajesEspera(lang: Lang): List<String> =
+    if (lang == Lang.ES) MENSAJES_ESPERA_ES else MENSAJES_ESPERA_EN
+
 @Composable
-private fun BurbujaEscribiendo() {
-    var indice by remember { mutableStateOf(MENSAJES_ESPERA.indices.random()) }
-    LaunchedEffect(Unit) {
+private fun BurbujaEscribiendo(lang: Lang) {
+    val mensajes = mensajesEspera(lang)
+    var indice by remember(lang) { mutableStateOf(mensajes.indices.random()) }
+    LaunchedEffect(lang) {
         while (true) {
             delay(4500)
-            indice = MENSAJES_ESPERA.indices.filter { it != indice }.random()
+            indice = mensajes.indices.filter { it != indice }.random()
         }
     }
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
@@ -702,14 +824,14 @@ private fun BurbujaEscribiendo() {
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                     Text(
-                        "Generando respuesta…",
+                        if (lang == Lang.ES) "Generando respuesta…" else "Generating response…",
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
                 Crossfade(targetState = indice, modifier = Modifier.padding(top = 6.dp)) { i ->
                     Text(
-                        MENSAJES_ESPERA[i],
+                        mensajes[i],
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         style = MaterialTheme.typography.bodySmall,
                     )
